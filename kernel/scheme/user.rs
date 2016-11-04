@@ -9,6 +9,7 @@ use arch::paging::{InactivePageTable, Page, VirtualAddress, entry};
 use arch::paging::temporary_page::TemporaryPage;
 use context::{self, Context};
 use context::memory::Grant;
+use scheme::root::ROOT_SCHEME_ID;
 use scheme::{AtomicSchemeId, ATOMIC_SCHEMEID_INIT, SchemeId};
 use sync::{WaitQueue, WaitMap};
 use syscall::data::{Packet, Stat, StatVfs};

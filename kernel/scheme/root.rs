@@ -7,8 +7,10 @@ use spin::RwLock;
 use context;
 use syscall::error::*;
 use syscall::scheme::Scheme;
-use scheme::{self, SchemeNamespace, SchemeId};
+use scheme::{self, AtomicSchemeId, ATOMIC_SCHEMEID_INIT, SchemeNamespace};
 use scheme::user::{UserInner, UserScheme};
+
+pub static ROOT_SCHEME_ID: AtomicSchemeId = ATOMIC_SCHEMEID_INIT;
 
 pub struct RootScheme {
     scheme_ns: SchemeNamespace,
