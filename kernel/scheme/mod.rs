@@ -9,7 +9,7 @@
 use alloc::arc::Arc;
 use alloc::boxed::Box;
 use collections::BTreeMap;
-use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use syscall::error::*;
