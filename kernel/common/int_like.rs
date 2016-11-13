@@ -62,14 +62,17 @@ macro_rules! int_like {
             pub fn store(&self, val: $new_type_name, order: ::core::sync::atomic::Ordering) {
                 self.container.store(val.into(), order)
             }
+
             #[allow(dead_code)]
             pub fn swap(&self, val: $new_type_name, order: ::core::sync::atomic::Ordering) -> $new_type_name {
                 $new_type_name::from(self.container.swap(val.into(), order))
             }
+
             #[allow(dead_code)]
             pub fn compare_and_swap(&self, current: $new_type_name, new: $new_type_name, order: ::core::sync::atomic::Ordering) -> $new_type_name {
                 $new_type_name::from(self.container.compare_and_swap(current.into(), new.into(), order))
             }
+
             #[allow(dead_code)]
             pub fn compare_exchange(&self, current: $new_type_name, new: $new_type_name, success: ::core::sync::atomic::Ordering, failure: ::core::sync::atomic::Ordering) -> ::core::result::Result<$new_type_name, $new_type_name> {
                 match self.container.compare_exchange(current.into(), new.into(), success, failure) {
@@ -77,6 +80,7 @@ macro_rules! int_like {
                     Err(result) => Err($new_type_name::from(result))
                 }
             }
+
             #[allow(dead_code)]
             pub fn compare_exchange_weak(&self, current: $new_type_name, new: $new_type_name, success: ::core::sync::atomic::Ordering, failure: ::core::sync::atomic::Ordering) -> ::core::result::Result<$new_type_name, $new_type_name> {
                 match self.container.compare_exchange_weak(current.into(), new.into(), success, failure) {
