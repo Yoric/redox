@@ -203,7 +203,11 @@ impl UserInner {
     }
 }
 
-/// UserInner has to be wrapped
+/// Wrapping `UserInner` as a scheme.
+///
+/// # Security
+///
+/// This scheme MUST ONLY be called by the root scheme.
 pub struct UserScheme {
     inner: Weak<UserInner>
 }
@@ -221,6 +225,14 @@ impl Scheme for UserScheme {
         let inner = self.inner.upgrade().ok_or(Error::new(ENODEV))?;
         let address = inner.capture(path)?;
         let result = inner.call(SYS_OPEN, address, path.len(), flags);
+        let _ = inner.release(address);
+        result
+    }
+
+    fn open_at(&self, path: &[u8], proof: usize) -> Result<usize> {
+        let inner = self.inner.upgrade().ok_or(Error::new(ENODEV))?;
+        let address = inner.capture(path)?;
+        let result = inner.call(SYS_OPEN, address, path.len(), proof);
         let _ = inner.release(address);
         result
     }
@@ -261,6 +273,14 @@ impl Scheme for UserScheme {
         let inner = self.inner.upgrade().ok_or(Error::new(ENODEV))?;
         let address = inner.capture(buf)?;
         let result = inner.call(SYS_DUP, file, address, buf.len());
+        let _ = inner.release(address);
+        result
+    }
+
+    fn dup_from(&self, path: &[u8], pid: usize) -> Result<usize> {
+        let inner = self.inner.upgrade().ok_or(Error::new(ENODEV))?;
+        let address = inner.capture(path)?;
+        let result = inner.call(SYS_DUP_FROM, address, path.len(), pid);
         let _ = inner.release(address);
         result
     }

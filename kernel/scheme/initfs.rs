@@ -43,6 +43,10 @@ impl InitFsScheme {
 
 impl Scheme for InitFsScheme {
     fn open(&self, path: &[u8], _flags: usize, _uid: u32, _gid: u32) -> Result<usize> {
+        self.open_at(path, 0)
+    }
+
+    fn open_at(&self, path: &[u8], _proof: usize) -> Result<usize> {
         let path_utf8 = str::from_utf8(path).map_err(|_err| Error::new(ENOENT))?;
         let path_trimmed = path_utf8.trim_matches('/');
 

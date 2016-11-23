@@ -15,6 +15,13 @@ pub static IRQ_SCHEME_ID: AtomicSchemeId = ATOMIC_SCHEMEID_INIT;
 static ACKS: Mutex<[usize; 16]> = Mutex::new([0; 16]);
 static COUNTS: Mutex<[usize; 16]> = Mutex::new([0; 16]);
 
+/// The universal capability.
+///
+/// We rely upon the fact that there are only two ways obtain this file descriptor:
+/// - obtain it through `dup_from`/`dup_to`;
+/// - inject it manually – in which case you need to be the kernel itself.
+pub const UNIVERSAL_CAPABILITY : usize = ::core::usize::MAX;
+
 /// Add to the input queue
 #[no_mangle]
 pub extern fn irq_trigger(irq: u8) {
@@ -29,19 +36,42 @@ impl IrqScheme {
         IRQ_SCHEME_ID.store(scheme_id, Ordering::SeqCst);
         IrqScheme
     }
+
+    /// Open a path.
+    ///
+    /// # Security
+    ///
+    /// This method MAY be called ONLY if the caller has the authorization
+    /// to open `path`.
+    fn open_authenticated(&self, path: &[u8]) -> Result<usize> {
+        let path_str = str::from_utf8(path).or(Err(Error::new(ENOENT)))?;
+
+        let id = path_str.parse::<usize>().or(Err(Error::new(ENOENT)))?;
+
+        if id < COUNTS.lock().len() {
+            Ok(id + 1)
+        } else {
+            Err(Error::new(ENOENT))
+        }
+    }
 }
 
 impl Scheme for IrqScheme {
     fn open(&self, path: &[u8], _flags: usize, uid: u32, _gid: u32) -> Result<usize> {
         if uid == 0 {
-            let path_str = str::from_utf8(path).or(Err(Error::new(ENOENT)))?;
+            self.open_authenticated(path)
+        } else {
+            Err(Error::new(EACCES))
+        }
+    }
 
-            let id = path_str.parse::<usize>().or(Err(Error::new(ENOENT)))?;
-
-            if id < COUNTS.lock().len() {
-                Ok(id)
+    fn open_at(&self, path: &[u8], proof: usize) -> Result<usize> {
+        if proof == UNIVERSAL_CAPABILITY {
+            // Someone is attempting to downgrade the universal capability into itself.
+            if path == b":*" {
+                Ok(UNIVERSAL_CAPABILITY)
             } else {
-                Err(Error::new(ENOENT))
+                self.open_authenticated(path)
             }
         } else {
             Err(Error::new(EACCES))

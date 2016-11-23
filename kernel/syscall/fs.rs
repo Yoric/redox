@@ -1,7 +1,7 @@
 //! Filesystem syscalls
 use core::sync::atomic::Ordering;
 
-use context;
+use context::{self, ContextId};
 use scheme::{self, FileHandle};
 use syscall;
 use syscall::data::{Packet, Stat};
@@ -80,9 +80,20 @@ pub fn getcwd(buf: &mut [u8]) -> Result<usize> {
     Ok(i)
 }
 
-/// Open syscall
-pub fn open(path: &[u8], flags: usize) -> Result<FileHandle> {
-    let (path_canon, uid, gid, scheme_ns) = {
+/// Internal use: the mechanism used to prove that the caller has the right
+/// to call `open`/`open_at`.
+enum OpenCredentials {
+    /// The caller provides a file handle that the scheme will use to determine
+    /// whether the path should be opened. We get this through `SYS_OPEN_AT`/`open_at`.
+    Capability(FileHandle),
+
+    /// The caller does not provide a proof. Extract `uid` and `gid` to determine whether
+    /// the current context should be allowed to open the path. We get this through
+    /// `SYS_OPEN`/`open`.
+    CurrentContext { flags: usize },
+}
+fn open_aux(path: &[u8], credentials: OpenCredentials) -> Result<FileHandle> {
+    let (path_canon, uid, gid) = {
         let contexts = context::contexts();
         let context_lock = contexts.current().ok_or(Error::new(ESRCH))?;
         let context = context_lock.read();
@@ -90,8 +101,8 @@ pub fn open(path: &[u8], flags: usize) -> Result<FileHandle> {
     };
 
     let mut parts = path_canon.splitn(2, |&b| b == b':');
-    let scheme_name_opt = parts.next();
-    let reference_opt = parts.next();
+    let namespace_opt = parts.next();
+    let reference_opt = parts.next().unwrap_or(b"");
 
     let (scheme_id, file_id) = {
         let scheme_name = scheme_name_opt.ok_or(Error::new(ENODEV))?;
@@ -100,7 +111,12 @@ pub fn open(path: &[u8], flags: usize) -> Result<FileHandle> {
             let (scheme_id, scheme) = schemes.get_name(scheme_ns, scheme_name).ok_or(Error::new(ENODEV))?;
             (scheme_id, scheme.clone())
         };
-        let file_id = scheme.open(reference_opt.unwrap_or(b""), flags, uid, gid)?;
+        let file_id = match credentials {
+            OpenCredentials::Capability(fd) =>
+                scheme.open_at(reference_opt, fd.into()),
+            OpenCredentials::CurrentContext{flags} =>
+                scheme.open(reference_opt, flags, uid, gid)
+        }?;
         (scheme_id, file_id)
     };
 
@@ -112,6 +128,16 @@ pub fn open(path: &[u8], flags: usize) -> Result<FileHandle> {
         number: file_id,
         event: None,
     }).ok_or(Error::new(EMFILE))
+}
+
+/// OpenAt syscall (SYS_OPEN_AT)
+pub fn open_at(path: &[u8], fd: FileHandle) -> Result<FileHandle> {
+    open_aux(path, OpenCredentials::Capability(fd))
+}
+
+/// Open syscall (SYS_OPEN)
+pub fn open(path: &[u8], flags: usize) -> Result<FileHandle> {
+    open_aux(path, OpenCredentials::CurrentContext{flags: flags})
 }
 
 pub fn pipe2(fds: &mut [usize], flags: usize) -> Result<usize> {
@@ -252,6 +278,27 @@ pub fn close(fd: FileHandle) -> Result<usize> {
         scheme.clone()
     };
     scheme.close(file.number)
+}
+
+pub fn dup_from(path: &[u8], pid: ContextId) -> Result<FileHandle> {
+    let path_canon = {
+        let contexts = context::contexts();
+        let context_lock = contexts.current().ok_or(Error::new(ESRCH))?;
+        let context = context_lock.read();
+        context.canonicalize(path)
+    };
+
+    let mut parts = path_canon.splitn(2, |&b| b == b':');
+    let namespace_opt = parts.next();
+
+    let namespace = namespace_opt.ok_or(Error::new(ENODEV))?;
+    let scheme = {
+        let schemes = scheme::schemes();
+        let (_scheme_id, scheme) = schemes.get_name(namespace).ok_or(Error::new(ENODEV))?;
+        scheme.clone()
+    };
+
+    scheme.dup_from(path, pid.into()).map(FileHandle::from)
 }
 
 /// Duplicate file descriptor

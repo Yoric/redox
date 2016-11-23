@@ -40,6 +40,12 @@ pub mod time;
 /// Validate input
 pub mod validate;
 
+/// Execute a syscall.
+///
+/// In `syscall(sys_id, b, c, d, e, f, stack)`,
+///
+/// - `sys_id` identifies the system call (see `syscall::number::SYS_*`);
+/// - `b`, `c`, `d`, `d`, `f` are the *untyped* arguments of the syscall
 #[no_mangle]
 pub extern fn syscall(a: usize, b: usize, c: usize, d: usize, e: usize, f: usize, stack: usize) -> usize {
     #[inline(always)]
@@ -61,6 +67,8 @@ pub extern fn syscall(a: usize, b: usize, c: usize, d: usize, e: usize, f: usize
             },
             SYS_CLASS_PATH => match a {
                 SYS_OPEN => open(validate_slice(b as *const u8, c)?, d).map(FileHandle::into),
+                SYS_OPEN_AT => open_at(validate_slice(b as *const u8, c)?, FileHandle::from(d)).map(FileHandle::into),
+                SYS_DUP_FROM => dup_from(validate_slice(b as *const u8, c)?, ContextId::from(d)).map(FileHandle::into),
                 SYS_MKDIR => mkdir(validate_slice(b as *const u8, c)?, d as u16),
                 SYS_CHMOD => chmod(validate_slice(b as *const u8, c)?, d as u16),
                 SYS_RMDIR => rmdir(validate_slice(b as *const u8, c)?),

@@ -25,7 +25,11 @@ impl EventScheme {
 }
 
 impl Scheme for EventScheme {
-    fn open(&self, _path: &[u8], _flags: usize, _uid: u32, _gid: u32) -> Result<usize> {
+    fn open(&self, path: &[u8], _flags: usize, _uid: u32, _gid: u32) -> Result<usize> {
+        self.open_at(path, 0)
+    }
+
+    fn open_at(&self, _path: &[u8], _proof: usize) -> Result<usize> {
         let handle = {
             let contexts = context::contexts();
             let context_lock = contexts.current().ok_or(Error::new(ESRCH))?;

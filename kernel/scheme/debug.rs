@@ -41,6 +41,10 @@ impl Scheme for DebugScheme {
         Ok(0)
     }
 
+    fn open_at(&self, _path: &[u8], _proof: usize) -> Result<usize> {
+        Ok(0)
+    }
+
     fn dup(&self, _file: usize, _buf: &[u8]) -> Result<usize> {
         Ok(0)
     }

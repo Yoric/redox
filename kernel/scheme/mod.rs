@@ -224,7 +224,7 @@ impl SchemeList {
 /// Schemes list
 static SCHEMES: Once<RwLock<SchemeList>> = Once::new();
 
-/// Initialize schemes, called if needed
+/// Initialize schemes, called the first time access to `schemes` or `schemes_mut` is requested.
 fn init_schemes() -> RwLock<SchemeList> {
     RwLock::new(SchemeList::new())
 }
